@@ -1,0 +1,19 @@
+api = "0.7"
+
+[extension]
+id = "redhat-runtimes/java"
+name = "RedHat Runtimes Java Dependency Extension"
+version = "0.0.2"
+description = "This extension installs the appropriate java runtime via dnf"
+
+[metadata]
+  include-files = ["LICENSE", "NOTICE", "README.md", "bin/generate", "bin/detect", "bin/run", "extension.toml"]
+  pre-package = "scripts/build.sh"
+
+  [[metadata.configurations]]
+    build = true
+    default = "17"
+    description = "the Java version"
+    name = "BP_JVM_VERSION"
+
+
