@@ -1,25 +1,17 @@
 package ubi8javaextension_test
 
 import (
-	"bytes"
 	_ "embed"
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	ubijavaextension "github.com/BarDweller/ubi-java-extension"
-	"github.com/BarDweller/ubi-java-extension/fakes"
 	. "github.com/onsi/gomega"
-	"github.com/paketo-buildpacks/packit/v2"
+	"github.com/paketo-buildpacks/libjvm/v2"
+	"github.com/paketo-buildpacks/libpak/v2"
+	ubijavaextension "github.com/paketo-community/ubi-java-extension/v1"
 	"github.com/sclevine/spec"
-
-	"github.com/paketo-buildpacks/packit/v2/cargo"
-
-	"github.com/BurntSushi/toml"
-	postal "github.com/paketo-buildpacks/packit/v2/postal"
 )
 
 type RunDockerfileProps struct {
@@ -96,349 +88,80 @@ RUN echo "CNB_STACK_ID: ubi8-paketo"`))
 func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 	var (
-		Expect               = NewWithT(t).Expect
-		workingDir           string
-		planPath             string
-		testBuildPlan        packit.BuildpackPlan
-		buf                  = new(bytes.Buffer)
-		generateResult       packit.GenerateResult
-		err                  error
-		cnbDir               string
-		dependencyManager    *fakes.DependencyManager
-		BuildDockerfileProps = ubijavaextension.BuildDockerfileProps{
-			CNB_USER_ID:  ubijavaextension.CNB_USER_ID,
-			CNB_GROUP_ID: ubijavaextension.CNB_GROUP_ID,
-			CNB_STACK_ID: "ubi8-paketo",
-			PACKAGES:     "openssl-devel java-17-openjdk-devel nss_wrapper which",
-		}
+		Expect     = NewWithT(t).Expect
+		workingDir string
+		err        error
+
+		generateResult libjvm.GenerateContentResult
 	)
 
-	context("Generate called with NO jdk/jre in buildplan", func() {
+	context("GenerateContentBuilder invoked", func() {
 		it.Before(func() {
 
 			workingDir = t.TempDir()
 			Expect(err).NotTo(HaveOccurred())
 
-			err = toml.NewEncoder(buf).Encode(testBuildPlan)
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(os.WriteFile(filepath.Join(workingDir, "plan"), buf.Bytes(), 0600)).To(Succeed())
-
 			err = os.Chdir(workingDir)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		it("Java no longer requested in buildplan", func() {
-			dependencyManager = &fakes.DependencyManager{}
-			dependencyManager.ResolveCall.Returns.Dependency = postal.Dependency{Name: "Java", ID: "jdk", Version: "17"}
-
-			generateResult, err = ubijavaextension.Generate(dependencyManager)(packit.GenerateContext{
-				WorkingDir: workingDir,
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{},
-				},
+		it("Java version 17 recognised", func() {
+			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
+					{Name: "BP_JVM_VERSION", Default: "17"},
+				}},
 			})
-			Expect(err).To(HaveOccurred())
-			Expect(generateResult.BuildDockerfile).To(BeNil())
-		})
-	}, spec.Sequential())
-
-	context("Generate called with jdk/jre in the buildplan", func() {
-		it.Before(func() {
-			workingDir = t.TempDir()
-			cnbDir, err = os.MkdirTemp("", "cnb")
-
-			err = toml.NewEncoder(buf).Encode(testBuildPlan)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(generateResult.BuildDockerfile).NotTo(BeNil())
+			Expect(generateResult.RunDockerfile).NotTo(BeNil())
 
-			planPath = filepath.Join(workingDir, "plan")
-			Expect(os.WriteFile(planPath, buf.Bytes(), 0600)).To(Succeed())
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, generateResult.RunDockerfile)
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/ubi8-paketo-run-java-17"))
 
-			err = os.Chdir(workingDir)
+			buf.Reset()
+			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
+			Expect(buf.String()).To(ContainSubstring("java-17-openjdk-devel"))
+		})
+
+		it("Java version 1.8 recognised", func() {
+			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
+					{Name: "BP_JVM_VERSION", Default: "1.8"},
+				}},
+			})
 			Expect(err).NotTo(HaveOccurred())
+			Expect(generateResult.BuildDockerfile).NotTo(BeNil())
+			Expect(generateResult.RunDockerfile).NotTo(BeNil())
 
-			t.Setenv("CNB_BP_PLAN_PATH", planPath)
-			t.Setenv("CNB_EXTENSION_DIR", cnbDir)
-			t.Setenv("CNB_OUTPUT_DIR", workingDir)
-			t.Setenv("CNB_PLATFORM_DIR", workingDir)
-			t.Setenv("CNB_STACK_ID", "ubi8-paketo")
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, generateResult.RunDockerfile)
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/ubi8-paketo-run-java-8"))
+
+			buf.Reset()
+			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
+			Expect(buf.String()).To(ContainSubstring("java-1.8.0-openjdk-devel"))
 		})
 
-		it("Specific version of java requested", func() {
-			dependencyManager := postal.NewService(cargo.NewTransport())
+		it("Java version 11 recognised", func() {
+			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
+					{Name: "BP_JVM_VERSION", Default: "11"},
+				}},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(generateResult.BuildDockerfile).NotTo(BeNil())
+			Expect(generateResult.RunDockerfile).NotTo(BeNil())
 
-			versionTests := []struct {
-				Name                               string
-				Metadata                           map[string]interface{}
-				RunDockerfileProps                 ubijavaextension.RunDockerfileProps
-				BuildDockerfileProps               ubijavaextension.BuildDockerfileProps
-				buildDockerfileExpectedJavaVersion string
-			}{
-				{
-					Name: "jdk",
-					Metadata: map[string]interface{}{
-						"version":        "17",
-						"version-source": "BP_JVM_VERSION",
-					},
-					RunDockerfileProps: ubijavaextension.RunDockerfileProps{
-						Source: "paketo-buildpacks/ubi8-paketo-run-java-17",
-					},
-					BuildDockerfileProps: ubijavaextension.BuildDockerfileProps{
-						CNB_USER_ID:  BuildDockerfileProps.CNB_USER_ID,
-						CNB_GROUP_ID: BuildDockerfileProps.CNB_GROUP_ID,
-						CNB_STACK_ID: BuildDockerfileProps.CNB_STACK_ID,
-						JAVA_VERSION: "17",
-						PACKAGES:     "openssl-devel java-17-openjdk-devel nss_wrapper which",
-					},
-					buildDockerfileExpectedJavaVersion: "17",
-				},
-				{
-					Name: "jdk",
-					Metadata: map[string]interface{}{
-						"version":        "11",
-						"version-source": "BP_JVM_VERSION",
-					},
-					RunDockerfileProps: ubijavaextension.RunDockerfileProps{
-						Source: "paketo-buildpacks/ubi8-paketo-run-java-11",
-					},
-					BuildDockerfileProps: ubijavaextension.BuildDockerfileProps{
-						CNB_USER_ID:  BuildDockerfileProps.CNB_USER_ID,
-						CNB_GROUP_ID: BuildDockerfileProps.CNB_GROUP_ID,
-						CNB_STACK_ID: BuildDockerfileProps.CNB_STACK_ID,
-						JAVA_VERSION: "11",
-						PACKAGES:     "openssl-devel java-11-openjdk-devel nss_wrapper which",
-					},
-					buildDockerfileExpectedJavaVersion: "11",
-				},
-				{
-					Name: "jdk",
-					Metadata: map[string]interface{}{
-						"version":        "8",
-						"version-source": "BP_JVM_VERSION",
-					},
-					RunDockerfileProps: ubijavaextension.RunDockerfileProps{
-						Source: "paketo-buildpacks/ubi8-paketo-run-java-8",
-					},
-					BuildDockerfileProps: ubijavaextension.BuildDockerfileProps{
-						CNB_USER_ID:  BuildDockerfileProps.CNB_USER_ID,
-						CNB_GROUP_ID: BuildDockerfileProps.CNB_GROUP_ID,
-						CNB_STACK_ID: BuildDockerfileProps.CNB_STACK_ID,
-						JAVA_VERSION: "8",
-						PACKAGES:     "openssl-devel java-1.8.0-openjdk-devel nss_wrapper which",
-					},
-					buildDockerfileExpectedJavaVersion: "8",
-				},
-			}
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, generateResult.RunDockerfile)
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/ubi8-paketo-run-java-11"))
 
-			for _, tt := range versionTests {
-
-				extensionToml, _ := readExtensionTomlTemplateFile(tt.buildDockerfileExpectedJavaVersion)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(cnbDir+"/extension.toml", []byte(extensionToml), 0600)).To(Succeed())
-
-				generateResult, err = ubijavaextension.Generate(dependencyManager)(packit.GenerateContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{
-								Name:     tt.Name,
-								Metadata: tt.Metadata,
-							},
-						},
-					},
-					Stack: "ubi8-paketo",
-				})
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(generateResult).NotTo(Equal(nil))
-
-				runDockerfileContent, _ := ubijavaextension.FillPropsToTemplate(tt.RunDockerfileProps, runDockerfileTemplate)
-				tt.BuildDockerfileProps.JAVA_VERSION = tt.buildDockerfileExpectedJavaVersion
-				buildDockerfileContent, _ := ubijavaextension.FillPropsToTemplate(tt.BuildDockerfileProps, buildDockerfileTemplate)
-
-				buf := new(strings.Builder)
-				_, _ = io.Copy(buf, generateResult.RunDockerfile)
-				Expect(buf.String()).To(Equal(runDockerfileContent))
-				buf.Reset()
-				_, _ = io.Copy(buf, generateResult.BuildDockerfile)
-				Expect(buf.String()).To(Equal(buildDockerfileContent))
-			}
-
-		})
-
-		it("should return the default when java version has NOT been requested", func() {
-			dependencyManager := postal.NewService(cargo.NewTransport())
-
-			versionTests := []struct {
-				Name                               string
-				Metadata                           map[string]interface{}
-				RunDockerfileProps                 ubijavaextension.RunDockerfileProps
-				BuildDockerfileProps               ubijavaextension.BuildDockerfileProps
-				buildDockerfileExpectedJavaVersion string
-			}{
-				{
-					Name:     "jdk",
-					Metadata: map[string]interface{}{},
-					RunDockerfileProps: ubijavaextension.RunDockerfileProps{
-						Source: "paketo-buildpacks/ubi8-paketo-run-java-17",
-					},
-					BuildDockerfileProps: ubijavaextension.BuildDockerfileProps{
-						CNB_USER_ID:  BuildDockerfileProps.CNB_USER_ID,
-						CNB_GROUP_ID: BuildDockerfileProps.CNB_GROUP_ID,
-						CNB_STACK_ID: BuildDockerfileProps.CNB_STACK_ID,
-						JAVA_VERSION: "17",
-						PACKAGES:     "openssl-devel java-17-openjdk-devel nss_wrapper which",
-					},
-					buildDockerfileExpectedJavaVersion: "17",
-				},
-				{
-					Name: "jdk",
-					Metadata: map[string]interface{}{
-						"version":        "",
-						"version-source": "BP_JVM_VERSION",
-					},
-					RunDockerfileProps: ubijavaextension.RunDockerfileProps{
-						Source: "paketo-buildpacks/ubi8-paketo-run-java-17",
-					},
-					BuildDockerfileProps: ubijavaextension.BuildDockerfileProps{
-						CNB_USER_ID:  BuildDockerfileProps.CNB_USER_ID,
-						CNB_GROUP_ID: BuildDockerfileProps.CNB_GROUP_ID,
-						CNB_STACK_ID: BuildDockerfileProps.CNB_STACK_ID,
-						JAVA_VERSION: "17",
-						PACKAGES:     "openssl-devel java-17-openjdk-devel nss_wrapper which",
-					},
-					buildDockerfileExpectedJavaVersion: "17",
-				},
-				{
-					Name: "jdk",
-					Metadata: map[string]interface{}{
-						"version":        "x",
-						"version-source": "BP_JVM_VERSION",
-					},
-					RunDockerfileProps: ubijavaextension.RunDockerfileProps{
-						Source: "paketo-buildpacks/ubi8-paketo-run-java-17",
-					},
-					BuildDockerfileProps: ubijavaextension.BuildDockerfileProps{
-						CNB_USER_ID:  BuildDockerfileProps.CNB_USER_ID,
-						CNB_GROUP_ID: BuildDockerfileProps.CNB_GROUP_ID,
-						CNB_STACK_ID: BuildDockerfileProps.CNB_STACK_ID,
-						JAVA_VERSION: "17",
-						PACKAGES:     "openssl-devel java-17-openjdk-devel nss_wrapper which",
-					},
-					buildDockerfileExpectedJavaVersion: "17",
-				},
-			}
-
-			for _, tt := range versionTests {
-
-				extensionToml, _ := readExtensionTomlTemplateFile(tt.buildDockerfileExpectedJavaVersion)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(os.WriteFile(cnbDir+"/extension.toml", []byte(extensionToml), 0600)).To(Succeed())
-
-				generateResult, err = ubijavaextension.Generate(dependencyManager)(packit.GenerateContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{
-								Name:     tt.Name,
-								Metadata: tt.Metadata,
-							},
-						},
-					},
-					Stack: "ubi8-paketo",
-				})
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(generateResult).NotTo(Equal(nil))
-
-				runDockerfileContent, _ := ubijavaextension.FillPropsToTemplate(tt.RunDockerfileProps, runDockerfileTemplate)
-				tt.BuildDockerfileProps.JAVA_VERSION = tt.buildDockerfileExpectedJavaVersion
-				buildDockerfileContent, _ := ubijavaextension.FillPropsToTemplate(tt.BuildDockerfileProps, buildDockerfileTemplate)
-
-				buf := new(strings.Builder)
-				_, _ = io.Copy(buf, generateResult.RunDockerfile)
-				Expect(buf.String()).To(Equal(runDockerfileContent))
-				buf.Reset()
-				_, _ = io.Copy(buf, generateResult.BuildDockerfile)
-				Expect(buf.String()).To(Equal(buildDockerfileContent))
-			}
-
-		})
-
-		it("Should error on below cases of requested java", func() {
-			dependencyManager := postal.NewService(cargo.NewTransport())
-
-			versionTests := []struct {
-				Name           string
-				Metadata       map[string]interface{}
-				BP_JVM_VERSION string
-			}{
-				{
-					Name:           "jdk",
-					Metadata:       map[string]interface{}{},
-					BP_JVM_VERSION: "16",
-				},
-				{
-					Name:           "jdk",
-					Metadata:       map[string]interface{}{},
-					BP_JVM_VERSION: "1.9.10",
-				},
-			}
-
-			for _, tt := range versionTests {
-
-				t.Setenv("BP_JVM_VERSION", tt.BP_JVM_VERSION)
-
-				fmt.Printf("testing with dir %s, %+v\n", cnbDir, tt)
-
-				generateResult, err = ubijavaextension.Generate(dependencyManager)(packit.GenerateContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{
-								Name:     tt.Name,
-								Metadata: tt.Metadata,
-							},
-						},
-					},
-					Stack: "ubi8-paketo",
-				})
-
-				Expect(err).To(HaveOccurred())
-			}
+			buf.Reset()
+			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
+			Expect(buf.String()).To(ContainSubstring("java-11-openjdk-devel"))
 		})
 
 	}, spec.Sequential())
 
-}
-
-func readExtensionTomlTemplateFile(defaultJavaVersion ...string) (string, error) {
-	var version string
-	if len(defaultJavaVersion) == 0 {
-		version = "17"
-	} else {
-		version = defaultJavaVersion[0]
-	}
-
-	template := `
-api = "0.7"
-
-[extension]
-id = "redhat-runtimes/java"
-name = "RedHat Runtimes Java Dependency Extension"
-version = "0.0.1"
-description = "This extension installs the appropriate java runtime via dnf"
-
-[metadata]
-
-  [[metadata.configurations]]
-    build = true
-    default = "%s"
-    description = "The Default Java version (testcase)"
-    name = "BP_JVM_VERSION"	
-`
-	return fmt.Sprintf(template, version), nil
 }

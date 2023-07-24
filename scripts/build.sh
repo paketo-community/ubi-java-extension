@@ -1,90 +1,20 @@
 #!/usr/bin/env bash
 
-set -eu
-set -o pipefail
+set -euo pipefail
 
 readonly PROGDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly BUILDPACKDIR="$(cd "${PROGDIR}/.." && pwd)"
+readonly DIR="$(cd "${PROGDIR}/.." && pwd)"
 
-function main() {
-  while [[ "${#}" != 0 ]]; do
-    case "${1}" in
-      --help|-h)
-        shift 1
-        usage
-        exit 0
-        ;;
+GOOS="linux" go build -ldflags='-s -w' -o bin/helper github.com/paketo-buildpacks/libjvm/v2/cmd/helper
+GOOS="linux" go build -ldflags='-s -w' -o bin/main "${DIR}/cmd"
 
-      "")
-        # skip if the argument is empty
-        shift 1
-        ;;
+if [ "${STRIP:-false}" != "false" ]; then
+  strip bin/helper bin/main
+fi
 
-      *)
-        util::print::error "unknown argument \"${1}\""
-    esac
-  done
+if [ "${COMPRESS:-none}" != "none" ]; then
+  $COMPRESS bin/helper bin/main
+fi
 
-  mkdir -p "${BUILDPACKDIR}/bin"
-
-  run::build
-  cmd::build
-}
-
-function usage() {
-  cat <<-USAGE
-build.sh [OPTIONS]
-
-Builds the buildpack executables.
-
-OPTIONS
-  --help  -h  prints the command usage
-USAGE
-}
-
-function run::build() {
-  if [[ -f "${BUILDPACKDIR}/run/main.go" ]]; then
-    pushd "${BUILDPACKDIR}/bin" > /dev/null || return
-      printf "%s" "Building run... "
-
-      GOOS=linux \
-      CGO_ENABLED=0 \
-        go build \
-          -ldflags="-s -w" \
-          -o "run" \
-            "${BUILDPACKDIR}/run"
-
-      echo "Success!"
-
-      for name in detect generate; do
-        printf "%s" "Linking ${name}... "
-
-        ln -sf "run" "${name}"
-
-        echo "Success!"
-      done
-    popd > /dev/null || return
-  fi
-}
-
-function cmd::build() {
-  if [[ -d "${BUILDPACKDIR}/cmd" ]]; then
-    local name
-    for src in "${BUILDPACKDIR}"/cmd/*; do
-      name="$(basename "${src}")"
-
-      printf "%s" "Building ${name}... "
-
-      GOOS="linux" \
-      CGO_ENABLED=0 \
-        go build \
-          -ldflags="-s -w" \
-          -o "${BUILDPACKDIR}/bin/${name}" \
-            "${src}/main.go"
-
-      echo "Success!"
-    done
-  fi
-}
-
-main "${@:-}"
+ln -fs main bin/generate
+ln -fs main bin/detect

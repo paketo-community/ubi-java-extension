@@ -8,7 +8,7 @@ RUN echo ${build_id}
 
 RUN microdnf --setopt=install_weak_deps=0 --setopt=tsflags=nodocs install -y {{.PACKAGES}} && microdnf clean all
 
-RUN echo uid:gid "{{.CNB_USER_ID}}:{{.CNB_GROUP_ID}}"
-USER {{.CNB_USER_ID}}:{{.CNB_GROUP_ID}}
+RUN echo "{{.JAVA_VERSION}}" > /bpi.paketo.ubi.java.version
+RUN echo "{{.JAVA_EXTENSION_HELPERS}}" > /bpi.paketo.ubi.java.helpers
 
-RUN echo "CNB_STACK_ID: {{.CNB_STACK_ID}}"
+USER {{.CNB_USER_ID}}:{{.CNB_GROUP_ID}}
