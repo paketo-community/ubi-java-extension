@@ -2,11 +2,8 @@
 
 set -euo pipefail
 
-readonly PROGDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly DIR="$(cd "${PROGDIR}/.." && pwd)"
-
 GOOS="linux" go build -ldflags='-s -w' -o bin/helper github.com/paketo-buildpacks/libjvm/v2/cmd/helper
-GOOS="linux" go build -ldflags='-s -w' -o bin/main "${DIR}/cmd"
+GOOS="linux" go build -ldflags='-s -w' -o bin/main github.com/paketo-community/ubi-java-extension/v1/cmd/main
 
 if [ "${STRIP:-false}" != "false" ]; then
   strip bin/helper bin/main
