@@ -3,10 +3,11 @@ package ubi8javaextension_test
 import (
 	"testing"
 
-	ubi8javaextension "github.com/BarDweller/ubi-java-extension"
+	libcnb "github.com/buildpacks/libcnb/v2"
+	ubi8javaextension "github.com/paketo-community/ubi-java-extension/v1"
 
 	. "github.com/onsi/gomega"
-	"github.com/paketo-buildpacks/packit/v2"
+	"github.com/paketo-buildpacks/libjvm/v2"
 	"github.com/sclevine/spec"
 )
 
@@ -14,40 +15,41 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 
 	var (
 		Expect = NewWithT(t).Expect
-		dc     packit.DetectContext
-		result packit.DetectResult
+		dc     libcnb.DetectContext
+		result libcnb.DetectResult
 		err    error
 	)
 
 	context("Detect Result Check", func() {
 		it.Before(func() {
-			dc = packit.DetectContext{}
+			dc = libcnb.DetectContext{}
 		})
 		it("includes build plan options", func() {
-			result, err = ubi8javaextension.Detect()(dc)
+			result, err = ubi8javaextension.Detect(dc)
 			Expect(err).NotTo(HaveOccurred())
+
 			Expect(result).To(Equal(
-				packit.DetectResult{
-					Plan: packit.BuildPlan{
-						Provides: []packit.BuildPlanProvision{
-							{Name: "jdk"},
-							{Name: "jre"},
-						},
-						Or: []packit.BuildPlan{
-							{
-								Provides: []packit.BuildPlanProvision{
-									{Name: "jdk"},
-								},
+				libcnb.DetectResult{
+					Pass: true,
+					Plans: []libcnb.BuildPlan{
+						{
+							Provides: []libcnb.BuildPlanProvide{
+								{Name: libjvm.PlanEntryJDK},
+								{Name: libjvm.PlanEntryJRE},
 							},
-							{
-								Provides: []packit.BuildPlanProvision{
-									{Name: "jre"},
-								},
+						},
+						{
+							Provides: []libcnb.BuildPlanProvide{
+								{Name: libjvm.PlanEntryJDK},
+							},
+						},
+						{
+							Provides: []libcnb.BuildPlanProvide{
+								{Name: libjvm.PlanEntryJRE},
 							},
 						},
 					},
 				}))
-
 		})
 	})
 }

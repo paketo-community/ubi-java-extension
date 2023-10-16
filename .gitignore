@@ -3,3 +3,6 @@
 /build
 .idea
 .DS_Store
+*.cnb
+package.toml
+/extension
