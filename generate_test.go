@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/paketo-buildpacks/libjvm/v2"
 	"github.com/paketo-buildpacks/libpak/v2"
+	"github.com/paketo-buildpacks/libpak/v2/log"
 	ubijavaextension "github.com/paketo-community/ubi-java-extension/v1"
 	"github.com/sclevine/spec"
 )
@@ -22,11 +23,12 @@ type RunDockerfileProps struct {
 var runDockerfileTemplate string
 
 type BuildDockerfileProps struct {
-	JAVA_VERSION string
-	CNB_USER_ID  int
-	CNB_GROUP_ID int
-	CNB_STACK_ID string
-	PACKAGES     string
+	JAVA_EXTENSION_HELPERS string
+	JAVA_VERSION           string
+	CNB_USER_ID            int
+	CNB_GROUP_ID           int
+	CNB_STACK_ID           string
+	PACKAGES               string
 }
 
 //go:embed templates/build.Dockerfile
@@ -43,11 +45,12 @@ func testFillPropsToTemplate(t *testing.T, context spec.G, it spec.S) {
 		it("Should fill with properties the template/build.Dockerfile", func() {
 
 			buildDockerfileProps := BuildDockerfileProps{
-				JAVA_VERSION: "17",
-				CNB_USER_ID:  1000,
-				CNB_GROUP_ID: 1000,
-				CNB_STACK_ID: "ubi8-paketo",
-				PACKAGES:     "openssl-devel java-17-openjdk-devel nss_wrapper which",
+				JAVA_VERSION:           "17",
+				CNB_USER_ID:            1000,
+				CNB_GROUP_ID:           1000,
+				CNB_STACK_ID:           "ubi8-paketo",
+				PACKAGES:               "openssl-devel java-17-openjdk-devel nss_wrapper which",
+				JAVA_EXTENSION_HELPERS: "helper1, helper2",
 			}
 
 			output, err := ubijavaextension.FillPropsToTemplate(buildDockerfileProps, buildDockerfileTemplate)
@@ -63,10 +66,10 @@ RUN echo ${build_id}
 
 RUN microdnf --setopt=install_weak_deps=0 --setopt=tsflags=nodocs install -y openssl-devel java-17-openjdk-devel nss_wrapper which && microdnf clean all
 
-RUN echo uid:gid "1000:1000"
-USER 1000:1000
+RUN echo "17" > /bpi.paketo.ubi.java.version
+RUN echo "helper1, helper2" > /bpi.paketo.ubi.java.helpers
 
-RUN echo "CNB_STACK_ID: ubi8-paketo"`))
+USER 1000:1000`))
 
 		})
 
@@ -107,6 +110,7 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 		it("Java version 17 recognised", func() {
 			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				Logger: log.NewDiscardLogger(),
 				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
 					{Name: "BP_JVM_VERSION", Default: "17"},
 				}},
@@ -126,6 +130,7 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 		it("Java version 1.8 recognised", func() {
 			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				Logger: log.NewDiscardLogger(),
 				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
 					{Name: "BP_JVM_VERSION", Default: "1.8"},
 				}},
@@ -145,6 +150,7 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 		it("Java version 11 recognised", func() {
 			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				Logger: log.NewDiscardLogger(),
 				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
 					{Name: "BP_JVM_VERSION", Default: "11"},
 				}},
