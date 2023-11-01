@@ -56,6 +56,15 @@ func Generate() libjvm.GenerateContentBuilder {
 		f := color.New(color.Faint)
 		ctx.Logger.Body(f.Sprintf("Using UBI Java package %s", buildver))
 
+		runOverride, explicit := ctx.ConfigurationResolver.Resolve("BP_UBI_RUN_IMAGE_OVERRIDE")
+		if explicit {
+			ctx.Logger.Body(f.Sprintf("Overriding run image with value from BP_UBI_RUN_IMAGE_OVERRIDE"))
+			runver = runOverride
+		}
+
+		//log choice of run image being selected
+		ctx.Logger.Body(f.Sprintf("Using UBI Java run image %s", runver))
+
 		// Create build.Dockerfile content
 		buildDockerfileProps := BuildDockerfileProps{
 			JAVA_VERSION:           JAVA_VERSION,
@@ -132,13 +141,13 @@ func mapRequestedVersionToPackageAndRunImage(requestedVersion string) (packages 
 	switch requestedVersion {
 	case "8", "1.8", "1.8.0":
 		buildver = "java-1.8.0-openjdk-devel"
-		runver = "paketocommunity/ubi8-paketo-run-java-8"
+		runver = "paketocommunity/run-java-8-ubi-base"
 	case "11":
 		buildver = "java-11-openjdk-devel"
-		runver = "paketocommunity/ubi8-paketo-run-java-11"
+		runver = "paketocommunity/run-java-11-ubi-base"
 	case "17":
 		buildver = "java-17-openjdk-devel"
-		runver = "paketocommunity/ubi8-paketo-run-java-17"
+		runver = "paketocommunity/run-java-17-ubi-base"
 	default:
 		buildver = ""
 		runver = ""

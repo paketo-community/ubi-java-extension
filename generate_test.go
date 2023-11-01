@@ -108,6 +108,10 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		it.After(func() {
+			os.Unsetenv("BP_UBI_RUN_IMAGE_OVERRIDE")
+		})
+
 		it("Java version 17 recognised", func() {
 			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
 				Logger: log.NewDiscardLogger(),
@@ -121,7 +125,7 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 			buf := new(strings.Builder)
 			_, _ = io.Copy(buf, generateResult.RunDockerfile)
-			Expect(buf.String()).To(ContainSubstring("paketocommunity/ubi8-paketo-run-java-17"))
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/run-java-17-ubi-base"))
 
 			buf.Reset()
 			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
@@ -141,7 +145,7 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 			buf := new(strings.Builder)
 			_, _ = io.Copy(buf, generateResult.RunDockerfile)
-			Expect(buf.String()).To(ContainSubstring("paketocommunity/ubi8-paketo-run-java-8"))
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/run-java-8-ubi-base"))
 
 			buf.Reset()
 			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
@@ -161,7 +165,28 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 			buf := new(strings.Builder)
 			_, _ = io.Copy(buf, generateResult.RunDockerfile)
-			Expect(buf.String()).To(ContainSubstring("paketocommunity/ubi8-paketo-run-java-11"))
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/run-java-11-ubi-base"))
+
+			buf.Reset()
+			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
+			Expect(buf.String()).To(ContainSubstring("java-11-openjdk-devel"))
+		})
+
+		it("Custom Java version", func() {
+			os.Setenv("BP_UBI_RUN_IMAGE_OVERRIDE", "stilettos/wibble:latest")
+			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				Logger: log.NewDiscardLogger(),
+				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
+					{Name: "BP_JVM_VERSION", Default: "11"},
+				}},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(generateResult.BuildDockerfile).NotTo(BeNil())
+			Expect(generateResult.RunDockerfile).NotTo(BeNil())
+
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, generateResult.RunDockerfile)
+			Expect(buf.String()).To(ContainSubstring("stilettos/wibble:latest"))
 
 			buf.Reset()
 			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
