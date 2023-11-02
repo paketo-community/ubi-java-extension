@@ -3,7 +3,7 @@ api = "0.9"
 [extension]
 id = "paketo-community/ubi-java-extension"
 name = "Paketo UBI Java Extension"
-version = "0.0.1"
+version = "{{.version}}"
 description = "This extension installs the appropriate java runtime via dnf"
 
 [metadata]
