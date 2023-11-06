@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/buildpacks/libcnb/v2 v2.0.0-alpha.2
-	github.com/fatih/color v1.15.0
+	github.com/fatih/color v1.16.0
 	github.com/onsi/gomega v1.29.0
 	github.com/paketo-buildpacks/libjvm/v2 v2.0.0-20230907003107-b65ea24a8efb
 	github.com/paketo-buildpacks/libpak/v2 v2.0.0-alpha.3
@@ -30,7 +30,7 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
