@@ -112,6 +112,26 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 			os.Unsetenv("BP_UBI_RUN_IMAGE_OVERRIDE")
 		})
 
+		it("Java version 21 recognised", func() {
+			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				Logger: log.NewDiscardLogger(),
+				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
+					{Name: "BP_JVM_VERSION", Default: "21"},
+				}},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(generateResult.BuildDockerfile).NotTo(BeNil())
+			Expect(generateResult.RunDockerfile).NotTo(BeNil())
+
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, generateResult.RunDockerfile)
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/run-java-21-ubi-base"))
+
+			buf.Reset()
+			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
+			Expect(buf.String()).To(ContainSubstring("java-21-openjdk-devel"))
+		})
+
 		it("Java version 17 recognised", func() {
 			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
 				Logger: log.NewDiscardLogger(),
