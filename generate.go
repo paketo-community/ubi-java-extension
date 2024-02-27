@@ -148,6 +148,9 @@ func mapRequestedVersionToPackageAndRunImage(requestedVersion string) (packages 
 	case "17":
 		buildver = "java-17-openjdk-devel"
 		runver = "paketocommunity/run-java-17-ubi-base"
+	case "21":
+		buildver = "java-21-openjdk-devel"
+		runver = "paketocommunity/run-java-21-ubi-base"
 	default:
 		buildver = ""
 		runver = ""
