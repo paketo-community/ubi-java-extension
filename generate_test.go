@@ -42,7 +42,7 @@ func testFillPropsToTemplate(t *testing.T, context spec.G, it spec.S) {
 
 	context("Adding props on templates with FillPropsToTemplate", func() {
 
-		it("Should fill with properties the template/build.Dockerfile", func() {
+		it("Java version 17: Should fill with properties the template/build.Dockerfile", func() {
 
 			buildDockerfileProps := BuildDockerfileProps{
 				JAVA_VERSION:           "17",
@@ -73,7 +73,7 @@ USER 1000:1000`))
 
 		})
 
-		it("Should fill with properties the template/run.Dockerfile", func() {
+		it("Java version 17: Should fill with properties the template/run.Dockerfile", func() {
 
 			RunDockerfileProps := RunDockerfileProps{
 				Source: "paketo-buildpacks/ubi8-paketo-run-java-17",
@@ -83,6 +83,50 @@ USER 1000:1000`))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(output).To(Equal(`FROM paketo-buildpacks/ubi8-paketo-run-java-17`))
+
+		})
+
+		it("Java version 21: Should fill with properties the template/build.Dockerfile", func() {
+
+			buildDockerfileProps := BuildDockerfileProps{
+				JAVA_VERSION:           "21",
+				CNB_USER_ID:            1000,
+				CNB_GROUP_ID:           1000,
+				CNB_STACK_ID:           "ubi8-paketo",
+				PACKAGES:               "openssl-devel java-21-openjdk-devel nss_wrapper which",
+				JAVA_EXTENSION_HELPERS: "helper1, helper2",
+			}
+
+			output, err := ubijavaextension.FillPropsToTemplate(buildDockerfileProps, buildDockerfileTemplate)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(Equal(`ARG base_image
+FROM ${base_image}
+
+USER root
+
+ARG build_id=0
+RUN echo ${build_id}
+
+RUN microdnf --setopt=install_weak_deps=0 --setopt=tsflags=nodocs install -y openssl-devel java-21-openjdk-devel nss_wrapper which && microdnf clean all
+
+RUN echo "21" > /bpi.paketo.ubi.java.version
+RUN echo "helper1, helper2" > /bpi.paketo.ubi.java.helpers
+
+USER 1000:1000`))
+
+		})
+
+		it("Java version 21: Should fill with properties the template/run.Dockerfile", func() {
+
+			RunDockerfileProps := RunDockerfileProps{
+				Source: "paketo-buildpacks/ubi8-paketo-run-java-21",
+			}
+
+			output, err := ubijavaextension.FillPropsToTemplate(RunDockerfileProps, runDockerfileTemplate)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(Equal(`FROM paketo-buildpacks/ubi8-paketo-run-java-21`))
 
 		})
 	})
@@ -110,6 +154,26 @@ func testGenerate(t *testing.T, context spec.G, it spec.S) {
 
 		it.After(func() {
 			os.Unsetenv("BP_UBI_RUN_IMAGE_OVERRIDE")
+		})
+
+		it("Java version 21 recognised", func() {
+			generateResult, err = ubijavaextension.Generate()(libjvm.GenerateContentContext{
+				Logger: log.NewDiscardLogger(),
+				ConfigurationResolver: libpak.ConfigurationResolver{Configurations: []libpak.BuildModuleConfiguration{
+					{Name: "BP_JVM_VERSION", Default: "21"},
+				}},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(generateResult.BuildDockerfile).NotTo(BeNil())
+			Expect(generateResult.RunDockerfile).NotTo(BeNil())
+
+			buf := new(strings.Builder)
+			_, _ = io.Copy(buf, generateResult.RunDockerfile)
+			Expect(buf.String()).To(ContainSubstring("paketocommunity/run-java-21-ubi-base"))
+
+			buf.Reset()
+			_, _ = io.Copy(buf, generateResult.BuildDockerfile)
+			Expect(buf.String()).To(ContainSubstring("java-21-openjdk-devel"))
 		})
 
 		it("Java version 17 recognised", func() {
